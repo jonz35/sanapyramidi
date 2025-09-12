@@ -120,12 +120,8 @@ body {
     transition: opacity 240ms ease;
 }
 
-.tile.intro .word {
+.tile.hiding .word {
     opacity: 0;
-}
-
-.tile.reveal-start .word {
-    opacity: 1;
 }
 
 .tile.selected {

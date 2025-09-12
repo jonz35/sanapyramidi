@@ -165,10 +165,12 @@ Config schema (URL-encoded in #game=):
         const play = document.getElementById('nav-play');
         const admin = document.getElementById('nav-admin');
         const help = document.getElementById('nav-help');
-        for (const el of [play, admin, help]) el.classList.remove('active');
-        if (mode === 'admin') admin.classList.add('active');
-        else if (mode === 'help') help.classList.add('active');
-        else play.classList.add('active');
+        const elements = [play, admin, help].filter(Boolean);
+        if (elements.length === 0) return;
+        elements.forEach(el => el.classList.remove('active'));
+        if (mode === 'admin' && admin) admin.classList.add('active');
+        else if (mode === 'help' && help) help.classList.add('active');
+        else if (play) play.classList.add('active');
     }
 
     // Admin UI removed; now lives in admin.html/admin.js
@@ -475,6 +477,8 @@ Config schema (URL-encoded in #game=):
 
         function startIntroReveal(root) {
             const tiles = Array.from(root.querySelectorAll('.tile'));
+            // prepare: hide words instantly before first paint
+            tiles.forEach(t => t.classList.add('hiding'));
             tiles.forEach((t, i) => {
                 const color = PALETTE[Math.floor(Math.random() * PALETTE.length)];
                 t.classList.add('intro');
@@ -482,16 +486,27 @@ Config schema (URL-encoded in #game=):
                 t.style.borderColor = color;
                 t.style.boxShadow = '0 0 12px 0 ' + hexToRgba(color, 0.35);
                 setTimeout(() => {
-                    t.classList.add('reveal-start');
-                    // after transition, clear intro styling
-                    setTimeout(() => {
+                    // begin darkening: clear inline colors to transition back to defaults
+                    const onEnd = (e) => {
+                        if (e.propertyName !== 'background-color' && e.propertyName !== 'background') return;
+                        t.removeEventListener('transitionend', onEnd);
+                        // show word only after dark background reached
+                        t.classList.remove('hiding');
                         t.classList.remove('intro');
-                        t.classList.remove('reveal-start');
-                        t.style.backgroundColor = '';
-                        t.style.borderColor = '';
                         t.style.boxShadow = '';
-                    }, 360);
-                }, 70 * i);
+                    };
+                    t.addEventListener('transitionend', onEnd);
+                    t.style.backgroundColor = '';
+                    t.style.borderColor = '';
+                    // safety fallback
+                    setTimeout(() => {
+                        if (t.classList.contains('hiding')) {
+                            t.classList.remove('hiding');
+                            t.classList.remove('intro');
+                            t.style.boxShadow = '';
+                        }
+                    }, 500);
+                }, 80 * i);
             });
         }
 
