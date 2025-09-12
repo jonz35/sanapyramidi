@@ -1,4 +1,4 @@
-// Sano Pyramidi – vanilla JS, URL-driven state (config only)
+// Sanapyramidi – vanilla JS, URL-driven state (config only)
 
 /*
 Config schema (URL-encoded in #game=):
@@ -262,9 +262,10 @@ Config schema (URL-encoded in #game=):
                 state.selected.clear();
                 updateTilesSelection();
                 if (state.remainingLives <= 0) {
+                    const msg = document.getElementById('message');
+                    if (msg) { msg.textContent = ''; msg.className = ''; }
                     revealAnswers(pyramidEl, config);
                     disableAll();
-                    setMessage('Out of lives. Answers revealed.', true);
                 }
             }
         }
@@ -405,10 +406,23 @@ Config schema (URL-encoded in #game=):
             layer.className = 'fireworks-layer';
             host.appendChild(layer);
 
-            const bursts = 5;
+            // Center bursts around the middle row (row 3)
+            const rowEl = host.querySelector('[data-row="3"]');
+            const hostRect = host.getBoundingClientRect();
+            let centerXPct = 50, centerYPct = 50;
+            if (rowEl && hostRect.width > 0 && hostRect.height > 0) {
+                const rowRect = rowEl.getBoundingClientRect();
+                const cx = (rowRect.left + rowRect.right) / 2;
+                const cy = (rowRect.top + rowRect.bottom) / 2;
+                centerXPct = ((cx - hostRect.left) / hostRect.width) * 100;
+                centerYPct = ((cy - hostRect.top) / hostRect.height) * 100;
+            }
+
+            const bursts = 4;
             for (let b = 0; b < bursts; b++) {
-                const burst = { xPct: 20 + Math.random() * 60, yPct: 8 + Math.random() * 20 };
-                spawnBurst(layer, burst.xPct, burst.yPct);
+                const jitterX = (Math.random() * 8) - 4; // +/-4%
+                const jitterY = (Math.random() * 6) - 3; // +/-3%
+                spawnBurst(layer, centerXPct + jitterX, centerYPct + jitterY);
             }
             setTimeout(() => { if (layer.parentNode) layer.parentNode.removeChild(layer); }, 1600);
         }

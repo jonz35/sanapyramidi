@@ -1,4 +1,4 @@
-# Sano Pyramidi
+# Sanapyramidi
 
 ## General
 The game is about categorizing words that belong together. The user is faced with 15 words categorized in 4 different groups: 1, 2, 3, 4 or 5 words.
