@@ -26,8 +26,8 @@ Config schema (URL-encoded in #game=):
         ]
     };
 
-    const SIZES = [1, 2, 3, 4, 5];
-    const TOTAL_WORDS = 15;
+    const MIN_ROWS = 5;
+    const MAX_ROWS = 10;
     const MAX_WORD_LENGTH = 16;
     const MAX_TITLE_LENGTH = 40;
     const PALETTE = ['#00e5ff', '#ff00aa', '#ffee00', '#00ff85', '#9b5eff', '#ff5e00'];
@@ -86,16 +86,28 @@ Config schema (URL-encoded in #game=):
     }
 
     function validateConfig(cfg) {
-        if (!cfg || !Array.isArray(cfg.categories) || cfg.categories.length !== 5) {
-            throw new Error('Config must have 5 categories.');
+        if (!cfg || !Array.isArray(cfg.categories)) {
+            throw new Error('Missing categories.');
         }
-        const sizes = SIZES.slice().sort((a, b) => a - b);
-        const seenSizes = [];
+        const catCount = cfg.categories.length;
+        if (catCount < MIN_ROWS || catCount > MAX_ROWS) {
+            throw new Error('Categories must be 5 to 10 groups.');
+        }
+        const sizesPresent = cfg.categories.map(c => Number(c.size)).filter(n => Number.isFinite(n));
+        const maxSize = Math.max.apply(null, sizesPresent);
+        if (catCount !== maxSize) {
+            throw new Error('Sizes must be continuous 1..N without gaps.');
+        }
+        if (maxSize < MIN_ROWS || maxSize > MAX_ROWS) {
+            throw new Error('Max size N must be between 5 and 10.');
+        }
+        const expectedSizes = Array.from({ length: maxSize }, (_, i) => i + 1);
+        const seenSizes = new Set();
         const allWords = new Set();
         for (const c of cfg.categories) {
-            if (!sizes.includes(c.size)) throw new Error('Category size must be 1..5, once each.');
-            if (seenSizes.includes(c.size)) throw new Error('Duplicate size definition.');
-            seenSizes.push(c.size);
+            if (!expectedSizes.includes(c.size)) throw new Error('Invalid category size. Must be 1..N.');
+            if (seenSizes.has(c.size)) throw new Error('Duplicate size definition.');
+            seenSizes.add(c.size);
             if (!Array.isArray(c.words) || c.words.length !== c.size) throw new Error('Words length must equal size.');
             for (const w of c.words) {
                 if (typeof w !== 'string' || !w.trim()) throw new Error('Words must be non-empty.');
@@ -107,11 +119,10 @@ Config schema (URL-encoded in #game=):
             if (typeof c.title !== 'string') c.title = '';
             if (c.title.length > MAX_TITLE_LENGTH) throw new Error('Title too long.');
         }
-        // ensure 1..5 sizes present exactly once
-        if (seenSizes.sort((a, b) => a - b).join(',') !== sizes.join(',')) {
-            throw new Error('Sizes 1..5 must appear exactly once.');
-        }
-        if (Array.from(allWords).length !== TOTAL_WORDS) throw new Error('Total words must be 15 unique.');
+        const sizesOk = expectedSizes.every(s => seenSizes.has(s));
+        if (!sizesOk) throw new Error('Sizes 1..N must appear exactly once.');
+        const expectedWords = (maxSize * (maxSize + 1)) / 2;
+        if (Array.from(allWords).length !== expectedWords) throw new Error('Total words must be ' + expectedWords + ' unique.');
     }
 
     function shuffle(array, seed) {
@@ -180,6 +191,10 @@ Config schema (URL-encoded in #game=):
         const seed = makeSeed(); // restart always
         const allWords = config.categories.flatMap(c => c.words.map(w => ({ word: w, size: c.size, title: c.title })));
         const randomized = shuffle(allWords, seed);
+
+        const maxRow = Math.max.apply(null, config.categories.map(c => c.size));
+        const SIZES = Array.from({ length: maxRow }, (_, i) => i + 1);
+        const TOTAL_WORDS = (maxRow * (maxRow + 1)) / 2;
 
         const state = {
             remainingLives: 4,
@@ -282,7 +297,7 @@ Config schema (URL-encoded in #game=):
         }
 
         function maybeWin() {
-            if (state.solvedBySize.size === 5) {
+            if (state.solvedBySize.size === maxRow) {
                 const msg = document.getElementById('message');
                 if (msg) msg.textContent = '';
                 launchFireworks();
@@ -350,7 +365,7 @@ Config schema (URL-encoded in #game=):
             } else {
                 // Update only unfinished rows to avoid flicker
                 const bounds = rowBounds();
-                for (let r = 1; r <= 5; r++) {
+                for (let r = 1; r <= maxRow; r++) {
                     const rowEl = pyramidEl.querySelector('[data-row="' + r + '"]');
                     if (!rowEl) continue;
                     if (state.solvedBySize.has(r)) {
@@ -408,8 +423,8 @@ Config schema (URL-encoded in #game=):
             layer.className = 'fireworks-layer';
             host.appendChild(layer);
 
-            // Center bursts around the middle row (row 3)
-            const rowEl = host.querySelector('[data-row="3"]');
+            // Center bursts around the middle row
+            const rowEl = host.querySelector('[data-row="' + Math.ceil(maxRow / 2) + '"]');
             const hostRect = host.getBoundingClientRect();
             let centerXPct = 50, centerYPct = 50;
             if (rowEl && hostRect.width > 0 && hostRect.height > 0) {
@@ -453,7 +468,7 @@ Config schema (URL-encoded in #game=):
         function renderPyramidFromWords(root, words) {
             root.innerHTML = '';
             let idx = 0;
-            for (let r = 1; r <= 5; r++) {
+            for (let r = 1; r <= maxRow; r++) {
                 const row = document.createElement('div');
                 row.className = 'row row-' + r;
                 row.setAttribute('data-row', String(r));
@@ -559,7 +574,7 @@ Config schema (URL-encoded in #game=):
             // returns map size-> [startIndex, endIndex]
             let start = 0;
             const map = {};
-            for (let r = 1; r <= 5; r++) {
+            for (let r = 1; r <= maxRow; r++) {
                 const end = start + r - 1;
                 map[r] = [start, end];
                 start = end + 1;

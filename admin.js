@@ -1,5 +1,6 @@
 (function () {
-    const SIZES = [1, 2, 3, 4, 5];
+    const MIN_ROWS = 5;
+    const MAX_ROWS = 10;
     const MAX_WORD_LENGTH = 16;
     const MAX_TITLE_LENGTH = 40;
 
@@ -33,15 +34,22 @@
     }
 
     function validateConfig(cfg) {
-        if (!cfg || !Array.isArray(cfg.categories) || cfg.categories.length !== 5) {
-            throw new Error('Config must have 5 categories.');
+        if (!cfg || !Array.isArray(cfg.categories)) {
+            throw new Error('Missing categories.');
         }
+        const count = cfg.categories.length;
+        if (count < MIN_ROWS || count > MAX_ROWS) throw new Error('Use 5 to 10 categories.');
+        const sizes = cfg.categories.map(c => Number(c.size));
+        const maxSize = Math.max.apply(null, sizes);
+        if (maxSize !== count) throw new Error('Sizes must be 1..N with no gaps.');
+        const expected = new Set(Array.from({ length: maxSize }, (_, i) => i + 1));
         const seen = new Set();
         const all = new Set();
         for (const c of cfg.categories) {
-            if (seen.has(c.size)) throw new Error('Sizes must be unique 1..5.');
+            if (!expected.has(c.size)) throw new Error('Invalid size.');
+            if (seen.has(c.size)) throw new Error('Duplicate size ' + c.size);
             seen.add(c.size);
-            if (!Array.isArray(c.words) || c.words.length !== c.size) throw new Error('Words length must match size.');
+            if (!Array.isArray(c.words) || c.words.length !== c.size) throw new Error('Words length must equal size.');
             for (const w of c.words) {
                 if (typeof w !== 'string' || !w.trim()) throw new Error('Words must be non-empty.');
                 if (w.length > MAX_WORD_LENGTH) throw new Error('Word too long.');
@@ -52,13 +60,18 @@
             if (typeof c.title !== 'string') c.title = '';
             if (c.title.length > MAX_TITLE_LENGTH) throw new Error('Title too long.');
         }
-        if (Array.from(all).length !== 15) throw new Error('Must have exactly 15 unique words.');
+        const expectedWords = (maxSize * (maxSize + 1)) / 2;
+        if (Array.from(all).length !== expectedWords) throw new Error('Must have exactly ' + expectedWords + ' unique words.');
     }
 
     function buildAdmin(config) {
         appRoot.innerHTML = '' +
-            '<section class="banner">Create a puzzle: 5 categories sized 1,2,3,4,5.</section>' +
+            '<section class="banner">Create a puzzle: 5–10 categories sized 1..N.</section>' +
             '<div class="admin-form" id="admin-form"></div>' +
+            '<div class="admin-actions">' +
+            '  <button id="add-cat-btn">Add category</button>' +
+            '  <button id="remove-cat-btn" class="danger">Remove last</button>' +
+            '</div>' +
             '<div class="admin-actions">' +
             '  <button id="save-play-btn" class="primary">Save & Play</button>' +
             '  <button id="copy-play-btn">Copy Play Link</button>' +
@@ -67,8 +80,33 @@
             '</div>' +
             '<div id="admin-preview"></div>';
 
+        let current = normalizeConfig(config);
         const formEl = document.getElementById('admin-form');
-        formEl.appendChild(buildAdminForm(config));
+        rerenderForm();
+
+        function rerenderForm() {
+            formEl.innerHTML = '';
+            formEl.appendChild(buildAdminForm(current));
+            // enable/disable add/remove
+            const canAdd = current.categories.length < MAX_ROWS;
+            const canRemove = current.categories.length > MIN_ROWS;
+            document.getElementById('add-cat-btn').disabled = !canAdd;
+            document.getElementById('remove-cat-btn').disabled = !canRemove;
+        }
+
+        document.getElementById('add-cat-btn').onclick = () => {
+            current = readAdminForm();
+            const nextSize = current.categories.length + 1;
+            if (nextSize > MAX_ROWS) return;
+            current.categories.push({ title: '', size: nextSize, words: new Array(nextSize).fill('') });
+            rerenderForm();
+        };
+        document.getElementById('remove-cat-btn').onclick = () => {
+            current = readAdminForm();
+            if (current.categories.length <= MIN_ROWS) return;
+            current.categories.pop();
+            rerenderForm();
+        };
 
         document.getElementById('save-play-btn').onclick = () => {
             const cfg = readAdminForm();
@@ -115,10 +153,12 @@
         const frag = document.createDocumentFragment();
         const container = document.createElement('div');
         container.className = 'admin-form-inner';
-        for (const size of SIZES) {
+        const maxSize = Math.max.apply(null, config.categories.map(c => c.size));
+        for (let size = 1; size <= maxSize; size++) {
             const cat = config.categories.find(c => c.size === size) || { title: '', size, words: new Array(size).fill('') };
             const section = document.createElement('section');
             section.className = 'category';
+            section.setAttribute('data-size', String(size));
             section.innerHTML = '' +
                 '<h3>Group of ' + size + '</h3>' +
                 '<div class="grid">' +
@@ -138,17 +178,41 @@
     }
 
     function readAdminForm() {
-        const categories = [];
-        for (const size of SIZES) {
-            const titleInput = document.querySelector('input[data-size="' + size + '"][data-field="title"]');
-            const csvInput = document.querySelector('textarea[data-size="' + size + '"][data-field="wordsCsv"]');
-            const words = (csvInput.value || '')
+        const sections = Array.from(document.querySelectorAll('section.category'));
+        const categories = sections.map(sec => {
+            const size = Number(sec.getAttribute('data-size'));
+            const titleInput = sec.querySelector('input[data-field="title"]');
+            const csvInput = sec.querySelector('textarea[data-field="wordsCsv"]');
+            const words = (csvInput && csvInput.value || '')
                 .split(',')
                 .map(s => s.trim())
                 .filter(s => s.length > 0);
-            categories.push({ title: (titleInput.value || '').trim(), size, words });
-        }
+            return { title: (titleInput && titleInput.value || '').trim(), size, words };
+        });
+        // Ensure sorted and sizes are 1..N
+        categories.sort((a, b) => a.size - b.size);
+        for (let i = 0; i < categories.length; i++) categories[i].size = i + 1;
         return { categories };
+    }
+
+    function normalizeConfig(cfg) {
+        const cats = Array.isArray(cfg.categories) ? cfg.categories.slice() : [];
+        cats.sort((a, b) => a.size - b.size);
+        let maxSize = cats.length > 0 ? Math.max.apply(null, cats.map(c => c.size)) : MIN_ROWS;
+        if (!Number.isFinite(maxSize) || maxSize < MIN_ROWS) maxSize = MIN_ROWS;
+        if (maxSize > MAX_ROWS) maxSize = MAX_ROWS;
+        const normalized = [];
+        for (let size = 1; size <= maxSize; size++) {
+            const found = cats.find(c => c.size === size);
+            if (found) {
+                const words = Array.isArray(found.words) ? found.words.slice(0, size) : [];
+                while (words.length < size) words.push('');
+                normalized.push({ title: typeof found.title === 'string' ? found.title : '', size, words });
+            } else {
+                normalized.push({ title: '', size, words: new Array(size).fill('') });
+            }
+        }
+        return { categories: normalized };
     }
 
     function safeValidate(cfg) {

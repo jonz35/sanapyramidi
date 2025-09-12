@@ -100,6 +100,26 @@ body {
     grid-template-columns: repeat(5, var(--tile-size));
 }
 
+.row-6 {
+    grid-template-columns: repeat(6, var(--tile-size));
+}
+
+.row-7 {
+    grid-template-columns: repeat(7, var(--tile-size));
+}
+
+.row-8 {
+    grid-template-columns: repeat(8, var(--tile-size));
+}
+
+.row-9 {
+    grid-template-columns: repeat(9, var(--tile-size));
+}
+
+.row-10 {
+    grid-template-columns: repeat(10, var(--tile-size));
+}
+
 .tile {
     background: var(--tile);
     border: 1px solid var(--tile-border);
