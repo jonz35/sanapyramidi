@@ -436,6 +436,17 @@ button:disabled {
 }
 
 /* Merged solved row */
+.site-footer {
+    position: fixed;
+    left: 50%;
+    bottom: 8px;
+    transform: translateX(-50%);
+    color: var(--muted);
+    font-size: 12px;
+    opacity: 0.8;
+    pointer-events: none;
+}
+
 .merged-cell {
     grid-column: 1 / -1;
     padding: 14px 10px;
