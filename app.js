@@ -23,7 +23,8 @@ Config schema (URL-encoded in #game=):
             { title: 'Trios', size: 3, words: ['Red', 'Green', 'Blue'] },
             { title: 'Quads', size: 4, words: ['North', 'South', 'East', 'West'] },
             { title: 'Vowels', size: 5, words: ['A', 'E', 'I', 'O', 'U'] }
-        ]
+        ],
+        theme: 'original'
     };
 
     const MIN_ROWS = 5;
@@ -167,9 +168,17 @@ Config schema (URL-encoded in #game=):
         } else if (mode === 'help') {
             renderHelp();
         } else {
+            applyTheme(config.theme || 'original');
             renderPlay(config);
         }
         updateNav(mode);
+    }
+
+    function applyTheme(theme) {
+        const root = document.documentElement;
+        root.classList.remove('theme-light', 'theme-sunset');
+        if (theme === 'light') root.classList.add('theme-light');
+        else if (theme === 'sunset') root.classList.add('theme-sunset');
     }
 
     function updateNav(mode) {

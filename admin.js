@@ -73,6 +73,13 @@
             '  <button id="remove-cat-btn" class="danger">Remove last</button>' +
             '</div>' +
             '<div class="admin-actions">' +
+            '  <label class="full-row">Theme<br>' +
+            '    <select id="theme-select">' +
+            '      <option value="original">Original</option>' +
+            '      <option value="light">Light</option>' +
+            '      <option value="sunset">Sunset</option>' +
+            '    </select>' +
+            '  </label>' +
             '  <button id="save-play-btn" class="primary">Save & Play</button>' +
             '  <button id="copy-play-btn">Copy Play Link</button>' +
             '  <button id="copy-admin-btn">Copy Admin Link</button>' +
@@ -83,6 +90,11 @@
         let current = normalizeConfig(config);
         const formEl = document.getElementById('admin-form');
         rerenderForm();
+        const themeSelect = document.getElementById('theme-select');
+        themeSelect.value = (current.theme || 'original');
+        themeSelect.onchange = () => {
+            current.theme = themeSelect.value;
+        };
 
         function rerenderForm() {
             formEl.innerHTML = '';
@@ -109,14 +121,14 @@
         };
 
         document.getElementById('save-play-btn').onclick = () => {
-            const cfg = readAdminForm();
+            const cfg = { ...readAdminForm(), theme: (document.getElementById('theme-select').value || 'original') };
             const err = safeValidate(cfg);
             if (err) return setAdminStatus(err, true);
             const url = buildUrl('play', cfg);
             location.href = './index.html#mode=play&game=' + encodeURIComponent(url.game);
         };
         document.getElementById('copy-play-btn').onclick = async () => {
-            const cfg = readAdminForm();
+            const cfg = { ...readAdminForm(), theme: (document.getElementById('theme-select').value || 'original') };
             const err = safeValidate(cfg);
             if (err) return setAdminStatus(err, true);
             const url = new URL(location.origin + location.pathname.replace('admin.html', 'index.html'));
@@ -126,7 +138,7 @@
             setAdminStatus('Play link copied.');
         };
         document.getElementById('copy-admin-btn').onclick = async () => {
-            const cfg = readAdminForm();
+            const cfg = { ...readAdminForm(), theme: (document.getElementById('theme-select').value || 'original') };
             const err = safeValidate(cfg);
             if (err) return setAdminStatus(err, true);
             const enc = encodeBase64Url(JSON.stringify(cfg));
@@ -192,7 +204,9 @@
         // Ensure sorted and sizes are 1..N
         categories.sort((a, b) => a.size - b.size);
         for (let i = 0; i < categories.length; i++) categories[i].size = i + 1;
-        return { categories };
+        const themeSelect = document.getElementById('theme-select');
+        const theme = themeSelect ? (themeSelect.value || 'original') : 'original';
+        return { categories, theme };
     }
 
     function normalizeConfig(cfg) {
@@ -252,7 +266,8 @@
                 { title: '', size: 3, words: ['', '', ''] },
                 { title: '', size: 4, words: ['', '', '', ''] },
                 { title: '', size: 5, words: ['', '', '', '', ''] },
-            ]
+            ],
+            theme: 'original'
         };
     }
 
